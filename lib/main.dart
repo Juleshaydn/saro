@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'providers/video_provider.dart';
 import 'screens/login_screen.dart';
 
 void main() {
@@ -21,18 +23,21 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Saro',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.light,
+    return ChangeNotifierProvider(
+      create: (_) => VideoProvider(),
+      child: MaterialApp(
+        title: 'Saro',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.blue,
+            brightness: Brightness.light,
+          ),
+          useMaterial3: true,
+          fontFamily: 'SF Pro Display',
         ),
-        useMaterial3: true,
-        fontFamily: 'SF Pro Display',
+        home: const LoginScreen(),
       ),
-      home: const LoginScreen(),
     );
   }
 }

@@ -1,10 +1,74 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 import 'dart:io' show Platform;
+import 'package:provider/provider.dart';
+import '../providers/video_provider.dart';
 
-class GenerateVideoScreen extends StatelessWidget {
+class GenerateVideoScreen extends StatefulWidget {
   const GenerateVideoScreen({super.key});
+
+  @override
+  State<GenerateVideoScreen> createState() => _GenerateVideoScreenState();
+}
+
+class _GenerateVideoScreenState extends State<GenerateVideoScreen> {
+  final TextEditingController _promptController = TextEditingController();
+  bool _isGenerating = false;
+
+  @override
+  void dispose() {
+    _promptController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _generateVideo() async {
+    if (_promptController.text.trim().isEmpty) {
+      _showError('Please enter a prompt');
+      return;
+    }
+
+    setState(() => _isGenerating = true);
+
+    try {
+      final provider = context.read<VideoProvider>();
+      await provider.generateVideo(_promptController.text.trim());
+
+      if (mounted) {
+        // Navigate to My Videos screen
+        DefaultTabController.of(context).animateTo(1); // Index 1 is My Videos
+        
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Video generation started!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        // Clear the prompt
+        _promptController.clear();
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError(e.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGenerating = false);
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,20 +123,11 @@ class GenerateVideoScreen extends StatelessWidget {
             const SizedBox(height: 20),
             _buildHeroSection(),
             const SizedBox(height: 32),
-            
-            // Native iOS 26 Liquid Glass Card
-            SizedBox(
-              height: 400,
-              child: const UiKitView(
-                viewType: 'LiquidGlassGenerateCard',
-                layoutDirection: TextDirection.ltr,
-                creationParams: null,
-                creationParamsCodec: StandardMessageCodec(),
-              ),
-            ),
-            
+            _buildPromptSection(context),
             const SizedBox(height: 24),
             _buildOptionsSection(context),
+            const SizedBox(height: 32),
+            _buildGenerateButton(context),
           ],
         ),
       ),
@@ -156,7 +211,7 @@ class GenerateVideoScreen extends StatelessWidget {
           Row(
             children: [
               Icon(
-                Icons.auto_awesome,
+                Platform.isIOS ? CupertinoIcons.wand_stars : Icons.auto_awesome,
                 color: Colors.blue.shade600,
                 size: 20,
               ),
@@ -173,7 +228,9 @@ class GenerateVideoScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           TextField(
+            controller: _promptController,
             maxLines: 5,
+            enabled: !_isGenerating,
             decoration: InputDecoration(
               hintText: 'Describe the video you want to create...',
               hintStyle: TextStyle(
@@ -224,23 +281,23 @@ class GenerateVideoScreen extends StatelessWidget {
             children: [
               _buildOptionRow(
                 context,
-                icon: Platform.isIOS ? CupertinoIcons.time : Icons.access_time,
-                title: 'Duration',
-                value: '30 seconds',
+                icon: Platform.isIOS ? CupertinoIcons.photo : Icons.image,
+                title: 'Format',
+                value: 'Portrait (9:16)',
               ),
               const Divider(height: 24),
               _buildOptionRow(
                 context,
-                icon: Platform.isIOS ? CupertinoIcons.rectangle : Icons.aspect_ratio,
-                title: 'Aspect Ratio',
-                value: '16:9',
+                icon: Platform.isIOS ? CupertinoIcons.sparkles : Icons.auto_awesome,
+                title: 'Quality',
+                value: 'Standard',
               ),
               const Divider(height: 24),
               _buildOptionRow(
                 context,
-                icon: Platform.isIOS ? CupertinoIcons.paintbrush : Icons.palette,
-                title: 'Style',
-                value: 'Realistic',
+                icon: Platform.isIOS ? CupertinoIcons.money_dollar : Icons.attach_money,
+                title: 'Cost',
+                value: r'~$0.04',
               ),
             ],
           ),
@@ -279,12 +336,6 @@ class GenerateVideoScreen extends StatelessWidget {
             fontWeight: FontWeight.w500,
           ),
         ),
-        const SizedBox(width: 8),
-        Icon(
-          Platform.isIOS ? CupertinoIcons.chevron_right : Icons.chevron_right,
-          color: Colors.grey.shade400,
-          size: 20,
-        ),
       ],
     );
   }
@@ -294,7 +345,7 @@ class GenerateVideoScreen extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       elevation: 4,
       child: InkWell(
-        onTap: () {},
+        onTap: _isGenerating ? null : _generateVideo,
         borderRadius: BorderRadius.circular(16),
         child: Container(
           width: double.infinity,
@@ -303,32 +354,54 @@ class GenerateVideoScreen extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Colors.blue.shade500,
-                Colors.purple.shade500,
-              ],
+              colors: _isGenerating
+                  ? [Colors.grey.shade400, Colors.grey.shade500]
+                  : [Colors.blue.shade500, Colors.purple.shade500],
             ),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.play_arrow_rounded,
-                color: Colors.white,
-                size: 24,
-              ),
-              SizedBox(width: 8),
-              Text(
-                'Generate Video',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+          child: _isGenerating
+              ? const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      'Generating...',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                )
+              : const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Generate Video',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );
